@@ -1,6 +1,8 @@
 # Copyright (c) 2015 Ansible, Inc.
 # All Rights Reserved.
 
+from decimal import Decimal
+
 from django.db import models, connection
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
@@ -37,6 +39,30 @@ class Instance(models.Model):
     version = models.CharField(max_length=24, blank=True)
     capacity = models.PositiveIntegerField(
         default=100,
+        editable=False,
+    )
+    capacity_adjustment = models.DecimalField(
+        default=Decimal(1.0),
+        max_digits=3,
+        decimal_places=2,
+    )
+    enabled = models.BooleanField(
+        default=True
+    )
+    cpu = models.IntegerField(
+        default=0,
+        editable=False,
+    )
+    memory = models.BigIntegerField(
+        default=0,
+        editable=False,
+    )
+    cpu_capacity = models.IntegerField(
+        default=0,
+        editable=False,
+    )
+    mem_capacity = models.IntegerField(
+        default=0,
         editable=False,
     )
 

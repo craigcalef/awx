@@ -2,7 +2,6 @@
 # All Rights Reserved.
 
 # Python
-import codecs
 from collections import OrderedDict, namedtuple
 import ConfigParser
 import cStringIO
@@ -53,7 +52,7 @@ from awx.main.exceptions import AwxTaskError
 from awx.main.queue import CallbackQueueDispatcher
 from awx.main.expect import run, isolated_manager
 from awx.main.utils import (get_ansible_version, get_ssh_version, decrypt_field, update_scm_url,
-                            check_proot_installed, build_proot_temp_dir, get_licenser,
+                            check_proot_installed, build_proot_temp_dir, get_licenser, get_cpu_capacity, get_mem_capacity,
                             wrap_args_with_proot, get_system_task_capacity, OutputEventFilter,
                             ignore_inventory_computed_fields, ignore_inventory_group_removal,
                             get_type_for_model, extract_ansible_vars)
@@ -316,11 +315,24 @@ def cluster_node_heartbeat(self):
             instance_list.remove(inst)
     if this_inst:
         startup_event = this_inst.is_lost(ref_time=nowtime)
-        if this_inst.capacity == 0:
+        if this_inst.capacity == 0 and this_inst.enabled:
             logger.warning('Rejoining the cluster as instance {}.'.format(this_inst.hostname))
-        this_inst.capacity = get_system_task_capacity()
-        this_inst.version = awx_application_version
-        this_inst.save(update_fields=['capacity', 'version', 'modified'])
+        if this_inst.enabled:
+            cpu = get_cpu_capacity()
+            mem = get_mem_capacity()
+            this_inst.capacity = get_system_task_capacity(this_inst.capacity_adjustment)
+            this_inst.cpu = cpu[0]
+            this_inst.memory = mem[0]
+            this_inst.cpu_capacity = cpu[1]
+            this_inst.mem_capacity = mem[1]
+            this_inst.version = awx_application_version
+            this_inst.save(update_fields=['capacity', 'version', 'modified', 'cpu',
+                                          'memory', 'cpu_capacity', 'mem_capacity'])
+            handle_ha_toplogy_changes.apply_async()
+        elif this_inst.capacity != 0 and not this_inst.enabled:
+            this_inst.capacity = 0
+            this_inst.save(update_fields=['capacity'])
+            handle_ha_toplogy_changes.apply_async()
         if startup_event:
             return
     else:
